@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower of Hanoi</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            background-image: url('hi.png');
+            background-color: #eed2e1; /* Màu nền nhẹ nhàng */
+        }
+        .tower-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .tower {
+            width: 270px; /* Tăng chiều rộng của tháp */
+            height: 370px; /* Chiều cao của tháp */
+            border: 2px solid #efb7c8; /* Màu viền tháp */
+            position: relative;
+            margin: 0 15px;
+            background-color: #fff; /* Màu nền của tháp */
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3); /* Đổ bóng cho tháp */
+            border-radius: 10px; /* Bo tròn các góc */
+        }
+        .disc {
+            position: absolute;
+            border-radius: 5px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+        }
+        .controls {
+            margin: 20px;
+            text-align: center;
+            background-color: #f5d1e4; /* Màu nền của phần điều khiển */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background-color: #3498db; /* Màu nút */
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9; /* Màu nút khi hover */
+        }
+        #steps {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .column {
+            position: absolute;
+            width: 10px;
+            height: 100%; /* Đặt chiều cao của cột */
+            background-color: #f1c2e1; /* Màu cột */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 0; /* Đặt cột ở dưới cùng */
+        }
+        .speed-control {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <label for="numDisks">Chọn số đĩa:</label>
+    <select id="numDisks">
+        <!-- Các tùy chọn từ 1 đến 10 -->
+        <script>
+            for (let i = 1; i <= 10; i++) {
+                document.write(`<option value="${i}">${i}</option>`);
+            }
+        </script>
+    </select>
+    <button id="reset">Reset</button>
+    <button id="solve">Giải</button>
+    <div id="timer">Thời gian: 0 giây</div>
+    <div id="steps">Số bước ngắn nhất: 0</div>
+    <div class="speed-control">
+        <label for="speed">Tốc độ (ms):</label>
+        <input type="range" id="speed" min="50" max="2000" value="1000" step="50">
+        <span id="speedValue">1000 ms</span>
+    </div>
+    <div id="rules">
+        <h3>Luật chơi:</h3>
+        <ul>
+            <li>Chỉ có thể di chuyển một đĩa tại một thời điểm.</li>
+            <li>Không được đặt đĩa lớn lên đĩa nhỏ.</li>
+            <li>Di chuyển tất cả đĩa từ cột 1 sang cột 3.</li>
+        </ul>
+    </div>
+</div>
+
+<div class="tower-container">
+    <div class="tower" id="tower1">
+        <div class="column"></div>
+    </div>
+    <div class="tower" id="tower2">
+        <div class="column"></div>
+    </div>
+    <div class="tower" id="tower3">
+        <div class="column"></div>
+    </div>
+</div>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+    var towers = { 1: [], 2: [], 3: [] };
+    var timerInterval;
+    var elapsedTime = 0;
+    var colors = [
+        "#3498db", "#2ecc71", "#e74c3c", "#f1c40f", "#9b59b6", 
+        "#30d8c8", "#f39c12", "#8e44ad", "#e67e22", "#1abc9c"
+    ]; // 10 màu sắc khác nhau
+    var totalMoves = 0;
+    var moveDelay = 1000; // Thời gian di chuyển mặc định
+
+    function initializeDisks(numDisks) {
+        towers = { 1: [], 2: [], 3: [] };
+        for (let i = numDisks; i >= 1; i--) {
+            towers[1].push(i);
+        }
+        totalMoves = Math.pow(2, numDisks) - 1; // Tính số bước ngắn nhất
+        $("#steps").text("Số bước ngắn nhất: " + totalMoves);
+        console.log("Số đĩa khởi tạo:", numDisks, towers[1]); // Debug
+        updateTowerView(numDisks);
+    }
+
+    function moveDisc(source, destination) {
+        if (towers[source].length === 0) return;
+        let disc = towers[source].pop();
+        towers[destination].push(disc);
+        updateTowerView(towers[source].length);
+    }
+
+    function updateTowerView(numDisks) {
+        $(".tower").empty();
+        Object.keys(towers).forEach(towerIndex => {
+            let tower = $("#tower" + towerIndex);
+            let discs = towers[towerIndex];
+            
+            discs.forEach((discSize, i) => {
+                let discWidth = 40 + discSize * 20;
+                let leftPosition = (tower.width() - discWidth) / 2;
+                let bottomPosition = i * 35 + 10; // Tăng khoảng cách giữa các đĩa
+                let discColor = colors[discSize - 1]; // Lấy màu sắc tương ứng
+
+                let disc = $("<div class='disc'>" + discSize + "</div>").css({
+                    "width": discWidth + "px",
+                    "height": "30px",
+                    "background-color": discColor,
+                    "bottom": bottomPosition + "px",
+                    "left": leftPosition + "px",
+                    "position": "absolute",
+                    "line-height": "30px",
+                    "text-align": "center",
+                    "z-index": 1 // Đặt đĩa ở trên cùng
+                });
+
+                tower.append(disc);
+            });
+
+            // Thêm cột giữa tháp
+            tower.append("<div class='column'></div>");
+        });
+    }
+
+    $(document).ready(function() {
+        $("#reset").click(function() {
+            let numDisks = parseInt($("#numDisks").val());
+            clearInterval(timerInterval);
+            elapsedTime = 0;
+            $("#timer").text("Thời gian: 0 giây");
+            initializeDisks(numDisks);
+        });
+
+        $("#solve").click(function() {
+            let numDisks = parseInt($("#numDisks").val());
+            solveWithDelay(numDisks, 1, 2, 3);
+        });
+
+        $("#speed").on("input", function() {
+            moveDelay = parseInt($(this).val());
+            $("#speedValue").text(moveDelay + " ms");
+        });
+
+        initializeDisks(5); // Khởi tạo với 5 đĩa
+    });
+
+    function solveWithDelay(n, source, auxiliary, destination) {
+        let moves = [];
+        generateMoves(n, source, auxiliary, destination, moves);
+        moveOneByOne(moves);
+    }
+
+    function generateMoves(n, source, auxiliary, destination, moves) {
+        if (n === 1) {
+            moves.push([source, destination]);
+        } else {
+            generateMoves(n - 1, source, destination, auxiliary, moves);
+            moves.push([source, destination]);
+            generateMoves(n - 1, auxiliary, source, destination, moves);
+        }
+    }
+
+    function moveOneByOne(moves) {
+        let i = 0;
+        clearInterval(timerInterval);
+        timerInterval = setInterval(function() {
+            if (i < moves.length) {
+                moveDisc(moves[i][0], moves[i][1]);
+                i++;
+                elapsedTime++;
+                $("#timer").text("Thời gian: " + elapsedTime + " giây");
+            } else {
+                clearInterval(timerInterval);
+            }
+        }, moveDelay);
+    }
+</script>
+
+</body>
+</html>
